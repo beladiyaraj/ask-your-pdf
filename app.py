@@ -3,8 +3,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
 from langchain.chains import RetrievalQA
+from langchain_core.documents import Document
 from colorama import Fore, Back, Style
-
+from typing import List
 
 # 1. Load the PDF
 loader = PyPDFLoader("Raj Beladiya Resume.pdf")
@@ -15,7 +16,7 @@ splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=250)
 docs = splitter.split_documents(pages)
 
 # store plain text for keyword search
-all_text_chunks = [doc.page_content for doc in docs]
+all_text_chunks: List[str] = [doc.page_content for doc in docs]
 
 # 3. Create local embeddings
 embeddings = OllamaEmbeddings(model="mistral")
@@ -25,14 +26,18 @@ db = Chroma.from_documents(docs, embeddings, persist_directory="./db")
 retriever = db.as_retriever(search_kwargs={"k": 3})
 
 # 5. Connect to local LLM
-llm = OllamaLLM(model="mistral")
-
+llm: OllamaLLM = OllamaLLM(model="mistral")
 
 # 6. Build QA chain
-qa = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+qa: RetrievalQA = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
 
 
-def hybrid_retriever(query, vectorstore, text_chunks, k=3):
+def hybrid_retriever(
+    query: str,
+    vectorstore: Chroma,
+    text_chunks: List[str],
+    k: int = 3
+) -> List[Document]:
     # vector retrieval
     vector_hits = vectorstore.similarity_search(query, k=k)
 
@@ -62,10 +67,10 @@ while True:
 
     # hybrid retrieval
     retrieved_chunks = hybrid_retriever(query, db, all_text_chunks, k=3)
+    print(Fore.GREEN + f"Retrieved chunks:{all_text_chunks}")
 
     # assemble the text for the LLM
     context_text = "\n".join(chunk.page_content for chunk in retrieved_chunks)
-    print()
 
     # prompt the LLM directly
     prompt = f"""Use the following document context to answer the question:
